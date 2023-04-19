@@ -1,10 +1,13 @@
 from fastapi import UploadFile, File
 from docx import Document
 import os
+
+
 def my_sum(x, y):
     return x + y
 
-def my_extract_images(file: UploadFile = File(...)):
+
+def my_extract_images(file):
     if file.filename.endswith('.docx'):
         document = Document(file.file)
         images = []
