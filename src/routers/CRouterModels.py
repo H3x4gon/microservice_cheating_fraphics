@@ -1,23 +1,33 @@
 from fastapi import APIRouter, UploadFile, File
-from ..services.CServiceModels import my_sum, my_extract_images
+from src.services.CServiceModels import upload_file, delete_imageset, delete_image_from_repos, get_imageset, rename_repos
 
-router = APIRouter(
+router = (APIRouter
+(
     prefix="/models",
     tags=["models"],
     responses={404: {"description": "Not found"}}
-)
-
+))
 
 @router.get("/about")
 def about():
-    return "Здесь собраны методы для вызова моделей обработки данных"
+    return "Здесь собраны методы для извлечения изображений из docx файла"
 
 
-@router.get("/sum")
-def m_sum(x: float = 0, y: float = 0):
-    return my_sum(x, y)
+@router.get("/get_imageset")
+def m_get_imageset(repos_name: str):
+    return get_imageset(repos_name)
 
-
-@router.post("/extract_images")
+@router.put("/rename_repos")
+def m_rename_repos(repos_name: str, new_repos_name: str):
+    return rename_repos(repos_name, new_repos_name)
+@router.post("/upload_file")
 def m_extract_images(file: UploadFile = File(...)):
-    return my_extract_images(file)
+    return upload_file(file)
+
+@router.delete("/delete_imageset")
+def m_delete_imageset(repos_name: str):
+    return delete_imageset(repos_name)
+
+@router.delete("/delete_image_from_repos")
+def m_delete_image_from_repos(repos_name: str, image_name: str):
+    return delete_image_from_repos(repos_name, image_name)
