@@ -1,5 +1,7 @@
 from fastapi import APIRouter, UploadFile, File
-from src.services.CServiceModels import upload_file, delete_imageset, delete_image_from_repos, get_imageset, rename_repos
+from services.CServiceModels import (upload_docx_and_extract_images, clear_bucket,
+                                     delete_image_from_bucket, get_imageset, rename_bucket, delete_bucket)
+from typing import List
 
 router = (APIRouter
 (
@@ -14,20 +16,23 @@ def about():
 
 
 @router.get("/get_imageset")
-def m_get_imageset(repos_name: str):
-    return get_imageset(repos_name)
+def m_get_imageset(bucket_name: str):
+    return get_imageset(bucket_name)
 
-@router.put("/rename_repos")
-def m_rename_repos(repos_name: str, new_repos_name: str):
-    return rename_repos(repos_name, new_repos_name)
-@router.post("/upload_file")
-def m_extract_images(file: UploadFile = File(...)):
-    return upload_file(file)
+@router.put("/rename_bucket")
+def m_rename_bucket(bucket_name: str, new_bucket_name: str):
+    return rename_bucket(bucket_name, new_bucket_name)
+@router.post("/upload_docx_and_extract_images")
+def m_upload_docx_and_extract_images(file: UploadFile = File(...)):
+    return upload_docx_and_extract_images(file)
 
+@router.delete("/delete_bucket")
+def m_delete_bucket(bucket_name: str):
+    return delete_bucket(bucket_name)
 @router.delete("/delete_imageset")
-def m_delete_imageset(repos_name: str):
-    return delete_imageset(repos_name)
+def m_delete_imageset(bucket_name: str):
+    return clear_bucket(bucket_name)
 
-@router.delete("/delete_image_from_repos")
-def m_delete_image_from_repos(repos_name: str, image_name: str):
-    return delete_image_from_repos(repos_name, image_name)
+@router.delete("/delete_image_from_bucket")
+def m_delete_image_from_bucket(bucket_name: str, image_name: str):
+    return delete_image_from_bucket(bucket_name, image_name)

@@ -1,0 +1,5 @@
+uvicorn
+fastapi
+PIL
+IO
+docx
