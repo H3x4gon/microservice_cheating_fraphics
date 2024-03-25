@@ -14,11 +14,14 @@ from base64 import b64encode
 
 
 class CImage(BaseModel):
-	relationship_id: str
+	report_id: str  # id отчета в базе данных, которому принадлежит изображение
+	relationship_id: str  # id связи изображения в отчете с изображением
 	filename: str
 	data: bytes  # предполагается, что это бинарные данные изображения
 	size: int
 	hash: Optional[str] = None
+	max_similarity: Optional[float] = None
+	img_id_with_max_similarity: Optional[str] = None
 
 	# Метод для преобразования экземпляра модели в JSON-совместимый словарь
 	def json_compatible(self):
@@ -29,7 +32,9 @@ class CImage(BaseModel):
 			"filename": self.filename,
 			#    "data": image_data_base64,
 			"size": self.size,
-			"hash": self.hash
+			"hash": self.hash,
+			"max_similarity": self.max_similarity,
+			"img_id_with_max_similarity": self.img_id_with_max_similarity
 		})
 
 
@@ -40,7 +45,7 @@ class CImageSet(BaseModel):
 		# Получаем каждый CImage в JSON-совместимом формате
 		images_json_compatible = {k: v.json_compatible() for k, v in self.images.items()}
 		return jsonable_encoder({
-			'images': images_json_compatible
+			images.key: images_json_compatible
 		})
 
 
@@ -86,6 +91,49 @@ def extract_images_from_docx(file) -> CImageSet:
 
 	return image_set
 
+
+def extract_and_compare_images_from_two_docx(incoming_file, stored_file) -> CImageSet:
+	# Создаем объект CImageSet
+	image_set = CImageSet()
+
+	with zipfile.ZipFile(file, "r") as zip_ref:
+		# Читаем файл отношений и строим словарь
+		rels_data = zip_ref.read('word/_rels/document.xml.rels')
+		rels_root = ET.fromstring(rels_data)
+		relationships = {
+			rel.attrib['Id']: rel.attrib['Target'].split('/')[-1]
+			for rel in
+			rels_root.findall('.//{http://schemas.openxmlformats.org/package/2006/relationships}Relationship')
+		}
+
+		# Создаем обратный словарь для быстрого поиска ID отношения по имени файла
+		filename_to_rel_id = {target: rel_id for rel_id, target in relationships.items()}
+
+		# Извлекаем изображения
+		for filename in zip_ref.namelist():
+			if filename.startswith("word/media/") and filename.count("/") == 2:
+				img_data = zip_ref.read(filename)
+				img_filename = os.path.basename(filename)
+
+				# Получаем relationship_id для изображения
+				relationship_id = filename_to_rel_id.get(img_filename)
+
+				# Если у изображения есть relationship_id, создаем объект CImage и добавляем в CImageSet
+				if relationship_id:
+					image_set.images[img_filename] = CImage(
+						relationship_id=relationship_id,
+						filename=img_filename,
+						data=img_data,
+						size=len(img_data),
+						hash=None
+					)
+
+	return image_set
+
+
+# def compare_incoming_and_stored_images(incoming_images: CImageSet, stored_images: CImageSet):
+# 	for img_name, img_obj in incoming_images.images.items():
+# 		for stored_img_name, stored_img_obj in stored_images.images.items():
 
 # Функция вычисления хэша
 def calc_image_hash(image_obj: CImage) -> str:
