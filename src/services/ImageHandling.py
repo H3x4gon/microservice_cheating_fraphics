@@ -14,27 +14,24 @@ from base64 import b64encode
 
 
 class CImage(BaseModel):
-	report_id: str  # id отчета в базе данных, которому принадлежит изображение
-	relationship_id: str  # id связи изображения в отчете с изображением
-	filename: str
-	data: bytes  # предполагается, что это бинарные данные изображения
-	size: int
+	filename: Optional[str] = None
+	data: Optional[bytes] = None  # предполагается, что это бинарные данные изображения
+	size: Optional[int] = None
 	hash: Optional[str] = None
 	max_similarity: Optional[float] = None
-	img_id_with_max_similarity: Optional[str] = None
+	img_path_with_max_similarity: Optional[str] = None
 
 	# Метод для преобразования экземпляра модели в JSON-совместимый словарь
 	def json_compatible(self):
 		# Кодируем байты в base64 для JSON-сериализации
 		# image_data_base64 = b64encode(self.data).decode('utf-8')
 		return jsonable_encoder({
-			"relationship_id": self.relationship_id,
 			"filename": self.filename,
 			#    "data": image_data_base64,
 			"size": self.size,
 			"hash": self.hash,
 			"max_similarity": self.max_similarity,
-			"img_id_with_max_similarity": self.img_id_with_max_similarity
+			"img_path_with_max_similarity": self.img_path_with_max_similarity
 		})
 
 
@@ -43,20 +40,28 @@ class CImageSet(BaseModel):
 
 	def json_compatible(self):
 		# Получаем каждый CImage в JSON-совместимом формате
-		images_json_compatible = {k: v.json_compatible() for k, v in self.images.items()}
+		images_json_compatible = {relationship_id: image.json_compatible() for relationship_id, image in
+								  self.images.items()}
 		return jsonable_encoder({
-			images.key: images_json_compatible
+			"report_id": images_json_compatible
 		})
 
 
-class CMinioImageSets(BaseModel):
-	repositories: Dict[str, CImageSet]  # Словарь для хранения CImageSet, где ключи - имена корзин MinIO
+class CReportsImageSets(BaseModel):
+	reports: Dict[str, CImageSet]
+
+	def json_compatible(self):
+		# Получаем каждый CImageSet в JSON-совместимом формате
+		reports_json_compatible = {file_path: report_images.json_compatible() for file_path, report_images in
+								   self.reports.items()}
+		return jsonable_encoder({
+			reports.key: reports_json_compatible
+		})
 
 
-def extract_images_from_docx(file) -> CImageSet:
+def extract_images_from_docx(file, file_path: str) -> CImageSet:
 	# Создаем объект CImageSet
 	image_set = CImageSet()
-
 	with zipfile.ZipFile(file, "r") as zip_ref:
 		# Читаем файл отношений и строим словарь
 		rels_data = zip_ref.read('word/_rels/document.xml.rels')
@@ -73,67 +78,56 @@ def extract_images_from_docx(file) -> CImageSet:
 		# Извлекаем изображения
 		for filename in zip_ref.namelist():
 			if filename.startswith("word/media/") and filename.count("/") == 2:
-				img_data = zip_ref.read(filename)
-				img_filename = os.path.basename(filename)
+				# Проверяем расширение файла
+				if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+					img_data = zip_ref.read(filename)
+					img_filename = os.path.basename(filename)
 
-				# Получаем relationship_id для изображения
-				relationship_id = filename_to_rel_id.get(img_filename)
+					# Получаем relationship_id для изображения
+					relationship_id = filename_to_rel_id.get(img_filename)
 
-				# Если у изображения есть relationship_id, создаем объект CImage и добавляем в CImageSet
-				if relationship_id:
-					image_set.images[img_filename] = CImage(
-						relationship_id=relationship_id,
-						filename=img_filename,
-						data=img_data,
-						size=len(img_data),
-						hash=None
-					)
-
-	return image_set
-
-
-def extract_and_compare_images_from_two_docx(incoming_file, stored_file) -> CImageSet:
-	# Создаем объект CImageSet
-	image_set = CImageSet()
-
-	with zipfile.ZipFile(file, "r") as zip_ref:
-		# Читаем файл отношений и строим словарь
-		rels_data = zip_ref.read('word/_rels/document.xml.rels')
-		rels_root = ET.fromstring(rels_data)
-		relationships = {
-			rel.attrib['Id']: rel.attrib['Target'].split('/')[-1]
-			for rel in
-			rels_root.findall('.//{http://schemas.openxmlformats.org/package/2006/relationships}Relationship')
-		}
-
-		# Создаем обратный словарь для быстрого поиска ID отношения по имени файла
-		filename_to_rel_id = {target: rel_id for rel_id, target in relationships.items()}
-
-		# Извлекаем изображения
-		for filename in zip_ref.namelist():
-			if filename.startswith("word/media/") and filename.count("/") == 2:
-				img_data = zip_ref.read(filename)
-				img_filename = os.path.basename(filename)
-
-				# Получаем relationship_id для изображения
-				relationship_id = filename_to_rel_id.get(img_filename)
-
-				# Если у изображения есть relationship_id, создаем объект CImage и добавляем в CImageSet
-				if relationship_id:
-					image_set.images[img_filename] = CImage(
-						relationship_id=relationship_id,
-						filename=img_filename,
-						data=img_data,
-						size=len(img_data),
-						hash=None
-					)
+					# Если у изображения есть relationship_id, создаем объект CImage и добавляем в CImageSet
+					if relationship_id:
+						image_set.images[relationship_id] = CImage(
+							filename=img_filename,
+							data=img_data,
+							size=len(img_data),
+							hash=None
+						)
 
 	return image_set
 
 
-# def compare_incoming_and_stored_images(incoming_images: CImageSet, stored_images: CImageSet):
-# 	for img_name, img_obj in incoming_images.images.items():
-# 		for stored_img_name, stored_img_obj in stored_images.images.items():
+def compare_image_sets(incoming_image_set: CImageSet, stored_image_set: CImageSet, method: str) -> CImageSet:
+
+	if method == "Pixel-by-pixel comparison method":
+		for incoming_image_id, incoming_image in incoming_image_set.images.items():
+			max_similarity = -1  # Начальное значение минимальной схожести
+			img_path_with_min_similarity = None
+
+			for stored_image_id, stored_image in stored_image_set.images.items():
+				similarity = compare_hash(incoming_image.hash, stored_image.hash)
+				normalized_similarity = 1 - (similarity / 64)  # Нормализуем сходство
+				if normalized_similarity > max_similarity:
+					max_similarity = normalized_similarity
+					img_path_with_min_similarity = stored_image_id + "/" + stored_image.filename
+
+			incoming_image.max_similarity = max_similarity
+			incoming_image.img_path_with_max_similarity = img_path_with_min_similarity
+
+	if method == "Sizeof comparison method":
+		for incoming_image_id, incoming_image in incoming_image_set.images.items():
+
+			for stored_image_id, stored_image in stored_image_set.images.items():
+				if incoming_image.size == stored_image.size:
+					# Если размеры изображений совпадают, считаем их идентичными
+					img_path_with_min_similarity = stored_image_id + "/" + stored_image.filename
+					incoming_image.max_similarity = 1
+					incoming_image.img_path_with_max_similarity = img_path_with_min_similarity
+					break  # Прерываем цикл, так как нашли совпадение по размеру
+
+	return incoming_image_set
+
 
 # Функция вычисления хэша
 def calc_image_hash(image_obj: CImage) -> str:
