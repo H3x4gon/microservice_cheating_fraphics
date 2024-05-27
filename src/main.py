@@ -7,10 +7,13 @@ import uvicorn
 
 from fastapi import FastAPI
 from routers import CRouterServiceCheating
+from routers import CRouterActiveSettings
 
 from database import create_tables
 from contextlib import asynccontextmanager
+from logconfig import init_logging
 
+import logging
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,11 +22,12 @@ async def lifespan(app: FastAPI):
 	yield
 	print("Выключение")
 
+init_logging()
 
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(CRouterServiceCheating.router)
-
+app.include_router(CRouterActiveSettings.router)
 
 @app.get("/")
 async def root():

@@ -14,12 +14,16 @@ from sqlalchemy.future import select
 
 from io import BytesIO
 
+import logging
 
 class NoImagesFoundError(Exception):
 	pass
 
 
 class CRepositoryServiceCheating:
+
+	logger = logging.getLogger("ServiceCheating")
+
 	@classmethod
 	# Выгрузка файла с MinIO
 	async def pull_file(

@@ -1,46 +1,26 @@
 from functools import lru_cache
-from pydantic import BaseModel
-import json
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class MinioConfig(BaseModel):
-	endpoint: str
-	access_key: str
-	secret_key: str
-	secure: bool
-	global_bucket_name: str
+class CConfig(BaseSettings):
+	logging_level: str = "INFO"
 
-class KeycloakConfig(BaseModel):
-	server_url: str
-	realm: str
-	client_id: str
-	client_secret: str
-	authorization_url: str
-	token_url: str
+	minio_endpoint: str = "play.min.io"
+	minio_access_key: str = "access_key"
+	minio_secret_key: str = "secret_key"
+	minio_secure: bool = True
+	minio_global_bucket_name: str = "bucket"
 
-class DBConfig(BaseModel):
-	host: str
-	port: str
-	name: str
-	user: str
-	password: str
+	db_host: str = "localhost"
+	db_port: int = 5432
+	db_name: str = "database"
+	db_user: str = "postgres"
+	db_password: str = "12345"
+
+	model_config = SettingsConfigDict(env_file=".env")
 
 
-class CConfig(BaseModel):
-	logging_level: str
-	db: DBConfig
-	minio: MinioConfig
-	keycloak: KeycloakConfig
-
-	@classmethod
-	def from_json(cls, filepath: str):
-		with open(filepath, 'r') as f:
-			config_data = json.load(f)
-		return cls(**config_data)
-
-
-# Загрузка настроек из JSON файла
-config = CConfig.from_json("config.json")
+config = CConfig()
 
 @lru_cache()
 def get_config():

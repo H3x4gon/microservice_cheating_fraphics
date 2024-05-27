@@ -61,7 +61,7 @@ def extract_images_from_docx(file) -> CImageSet:
 	return image_set
 
 
-def pixel_by_pixel_comparison(incoming_image_set: CImageSet, stored_image_set: CImageSet):
+def avg_hash_comparison(incoming_image_set: CImageSet, stored_image_set: CImageSet):
 	for incoming_image_id, incoming_image in incoming_image_set.images.items():
 		max_similarity = -1
 		img_path_with_min_similarity = None
@@ -90,8 +90,8 @@ def sizeof_comparison(incoming_image_set: CImageSet, stored_image_set: CImageSet
 
 
 def compare_image_sets(incoming_image_set: CImageSet, stored_image_set: CImageSet, method: str) -> CImageSet:
-	if method == "Pixel-by-pixel comparison method":
-		pixel_by_pixel_comparison(incoming_image_set, stored_image_set)
+	if method == "AvgHash comparison method":
+		avg_hash_comparison(incoming_image_set, stored_image_set)
 	elif method == "Sizeof comparison method":
 		sizeof_comparison(incoming_image_set, stored_image_set)
 

@@ -2,10 +2,10 @@ from minio import Minio
 from src.config import config
 
 client = Minio(
-	endpoint=config.minio.endpoint,
-	access_key=config.minio.access_key,
-	secret_key=config.minio.secret_key,
-	secure=config.minio.secure
+	endpoint=config.minio_endpoint,
+	access_key=config.minio_access_key,
+	secret_key=config.minio_secret_key,
+	secure=config.minio_secure
 )
 
-global_bucket_name = config.minio.global_bucket_name
+global_bucket_name = config.minio_global_bucket_name
