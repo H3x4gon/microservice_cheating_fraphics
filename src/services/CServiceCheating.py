@@ -1,23 +1,25 @@
 from fastapi import UploadFile, File, Query, HTTPException
 from fastapi.responses import JSONResponse
 from io import BytesIO
-
-from .ImageHandling import extract_images_from_docx, compare_image_sets
-from src.repositories.CRepositoryServiceCheating import CRepositoryServiceCheating
 from fastapi.encoders import jsonable_encoder
 from uuid import UUID
 from minio.error import S3Error
-from src.storage import client, global_bucket_name
 
-from schemas.schemas import CImage, CImageSet
+from .CServiceImages import extract_images_from_docx, compare_image_sets
+from src.repositories.CRepositoryServiceCheating import CRepositoryServiceCheating
+from src.storage import client
+from src.schemas.schemas import CImage, CImageSet
 
 
 class CServiceCheating:
+
 	@classmethod
-	async def check_images_for_uniqueness(cls,
-	                                      document_version: UUID,
-	                                      async_session,
-	                                      method: str = Query(...)):
+	async def check_images_for_uniqueness(
+		cls,
+		document_version: UUID,
+		async_session,
+		method: str = Query(...)
+	):
 
 		try:
 			suspect_metadata = await CRepositoryServiceCheating.pull_images_metadata(
@@ -48,10 +50,11 @@ class CServiceCheating:
 			raise e
 
 	@classmethod
-	async def upload_images_to_global_bucket(cls,
-	                                         document_version: UUID,
-	                                         async_session
-	                                         ):
+	async def upload_images_to_global_bucket(
+		cls,
+		document_version: UUID,
+		async_session
+	):
 		try:
 			file_data = await CRepositoryServiceCheating.pull_file(
 				document_version
@@ -71,10 +74,11 @@ class CServiceCheating:
 			raise e
 
 	@classmethod
-	async def delete_images_from_global_bucket(cls,
-	                                           document_version: UUID,
-	                                           async_session
-	                                           ):
+	async def delete_images_from_global_bucket(
+		cls,
+		document_version: UUID,
+		async_session
+	):
 		try:
 			await CRepositoryServiceCheating.delete(
 				async_session,

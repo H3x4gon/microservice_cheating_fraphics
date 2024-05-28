@@ -5,7 +5,5 @@ client = Minio(
 	endpoint=config.minio_endpoint,
 	access_key=config.minio_access_key,
 	secret_key=config.minio_secret_key,
-	secure=config.minio_secure
+	secure=config.minio_ssl
 )
-
-global_bucket_name = config.minio_global_bucket_name

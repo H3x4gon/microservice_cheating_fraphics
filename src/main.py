@@ -1,37 +1,49 @@
-import sys
-import os
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import uvicorn
 
 from fastapi import FastAPI
-from routers import CRouterServiceCheating
-from routers import CRouterActiveSettings
+from fastapi.middleware.cors import CORSMiddleware
 
-from database import create_tables
-from contextlib import asynccontextmanager
-from logconfig import init_logging
+from src.logconfig import init_logging
+from src.routers import CRouterServiceCheating
+from src.routers import CRouterActiveSettings
+from src.database import create_tables
 
-import logging
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-	await create_tables()
-	print("База создана и готова к работе")
-	yield
-	print("Выключение")
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 init_logging()
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 app.include_router(CRouterServiceCheating.router)
 app.include_router(CRouterActiveSettings.router)
 
+origins = [
+    "http://localhost:3000",
+    "http://localhost",
+    "http://localhost:8080"
+]
+app.add_middleware(
+	CORSMiddleware,
+	allow_origins=origins,
+	allow_credentials=True,
+	allow_methods=["*"],
+	allow_headers=["*"],
+)
+
+
+@app.on_event("startup")
+async def on_startup():
+	await create_tables()
+
+
 @app.get("/")
 async def root():
-	return {"message": "Зайдите в эндпоинт /docs"}
+	return {"message": "Документация по запросам доступна по пути /docs"}
+
+
+@app.get("/test")
+def read_root():
+	return 1
 
 
 if __name__ == "__main__":

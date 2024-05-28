@@ -12,9 +12,9 @@ from numpy import count_nonzero, array
 from base64 import b64encode
 from typing import Dict
 
-from schemas.schemas import CImage
-from schemas.schemas import CImageSet
-from src.storage import global_bucket_name
+from src.schemas.schemas import CImage
+from src.schemas.schemas import CImageSet
+from src.config import config
 
 
 def extract_relationships(zip_ref: zipfile.ZipFile) -> Dict[str, str]:
@@ -71,7 +71,7 @@ def avg_hash_comparison(incoming_image_set: CImageSet, stored_image_set: CImageS
 			normalized_similarity = 1 - (similarity / 64)
 			if normalized_similarity > max_similarity:
 				max_similarity = normalized_similarity
-				img_path_with_min_similarity = global_bucket_name + "/images/" + str(
+				img_path_with_min_similarity = config.minio_bucket_name + "/images/" + str(
 					stored_image.document_ver_id) + "/" + str(stored_image.id) + ".png"
 
 		incoming_image.max_similarity = max_similarity
@@ -82,7 +82,7 @@ def sizeof_comparison(incoming_image_set: CImageSet, stored_image_set: CImageSet
 	for incoming_image_id, incoming_image in incoming_image_set.images.items():
 		for stored_image_id, stored_image in stored_image_set.images.items():
 			if incoming_image.size == stored_image.size:
-				img_path_with_min_similarity = global_bucket_name + "/images/" + str(
+				img_path_with_min_similarity = config.minio_bucket_name + "/images/" + str(
 					stored_image.document_ver_id) + "/" + str(stored_image.id) + ".png"
 				incoming_image.max_similarity = 1
 				incoming_image.img_path_with_max_similarity = img_path_with_min_similarity

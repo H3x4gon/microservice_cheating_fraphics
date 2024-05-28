@@ -8,8 +8,8 @@ class CConfig(BaseSettings):
 	minio_endpoint: str = "play.min.io"
 	minio_access_key: str = "access_key"
 	minio_secret_key: str = "secret_key"
-	minio_secure: bool = True
-	minio_global_bucket_name: str = "bucket"
+	minio_ssl: bool = True
+	minio_bucket_name: str = "bucket"
 
 	db_host: str = "localhost"
 	db_port: int = 5432
@@ -21,6 +21,7 @@ class CConfig(BaseSettings):
 
 
 config = CConfig()
+
 
 @lru_cache()
 def get_config():

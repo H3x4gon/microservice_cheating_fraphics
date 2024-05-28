@@ -67,6 +67,7 @@ class SQLDocumentVersion(Base):
 	dttm = Column(TIMESTAMP, nullable=False)
 	document = relationship("SQLDocument")
 
+
 # Модель изображения
 class SQLImage(Base):
 	__tablename__ = 'images'

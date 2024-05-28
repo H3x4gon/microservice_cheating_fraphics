@@ -1,20 +1,16 @@
-from models.db_models import SQLImage, SQLDocumentVersion, SQLDocument, SQLReport, SQLCheckpoint, SQLSubject, \
-	SQLStudent, SQLUser
-
-from src.storage import client, global_bucket_name
-from schemas.schemas import CImageSet
-
+import logging
+from io import BytesIO
 from uuid import UUID, uuid4
-from storage import client, global_bucket_name
-
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.future import select
 
-from io import BytesIO
+from src.storage import client
+from src.models.db_models import SQLImage, SQLDocumentVersion, SQLDocument, SQLReport, SQLCheckpoint, SQLSubject, \
+	SQLStudent, SQLUser
+from src.schemas.schemas import CImageSet
 
-import logging
 
 class NoImagesFoundError(Exception):
 	pass
@@ -22,7 +18,7 @@ class NoImagesFoundError(Exception):
 
 class CRepositoryServiceCheating:
 
-	logger = logging.getLogger("ServiceCheating")
+	logger = logging.getLogger("ServiceCheatingGraphics")
 
 	@classmethod
 	# Выгрузка файла с MinIO
@@ -35,7 +31,7 @@ class CRepositoryServiceCheating:
 		file_path = f"documents/{document_name}.docx"
 
 		# Загружаем файл
-		response = client.get_object(global_bucket_name, file_path)
+		response = client.get_object(config.minio_bucket_name, file_path)
 
 		# Считываем все данные из потока в формате BytesIO
 		file_data = BytesIO(response.read())
@@ -49,34 +45,37 @@ class CRepositoryServiceCheating:
 			document_version: UUID,
 			async_session: AsyncSession
 	):
-		async with async_session.begin():
-			# Получаем существующие записи изображений для данной версии документа
-			result = await async_session.execute(
-				select(SQLImage).
-				where(SQLImage.document_ver_id == document_version)
-			)
-			existing_images = result.scalars().all()
+		# async with async_session.begin():
+		# Получаем существующие записи изображений для данной версии документа
+		result = await async_session.execute(
+			select(SQLImage).
+			where(SQLImage.document_ver_id == document_version)
+		)
+		existing_images = result.scalars().all()
 
 		return list(existing_images)
 
 	@classmethod
-	async def pull_all_other_user_images_metadata(cls,
-	                                              document_version_id: UUID,
-	                                              async_session: AsyncSession
-	                                              ):
+	async def pull_all_other_user_images_metadata(
+		cls,
+		document_version_id: UUID,
+		async_session: AsyncSession
+	):
 		async with async_session.begin():
 			# Получаем пользователя по версии документа
 			result = await async_session.execute(
 				select(SQLUser)
-				.join(SQLStudent)
-				.join(SQLReport)
-				.join(SQLDocument)
-				.join(SQLDocumentVersion)
-				.where(SQLDocumentVersion.id == document_version_id)
-				.options(joinedload(SQLUser.student)
-				         .joinedload(SQLStudent.reports)
-				         .joinedload(SQLReport.documents)
-				         .joinedload(SQLDocument.versions))
+					.join(SQLStudent)
+					.join(SQLReport)
+					.join(SQLDocument)
+					.join(SQLDocumentVersion)
+					.where(SQLDocumentVersion.id == document_version_id)
+					.options(
+						joinedload(SQLUser.student)
+						.joinedload(SQLStudent.reports)
+						.joinedload(SQLReport.documents)
+						.joinedload(SQLDocument.versions)
+					)
 			)
 			user = result.scalars().first()
 
@@ -92,9 +91,10 @@ class CRepositoryServiceCheating:
 				.join(SQLStudent)
 				.join(SQLUser)
 				.where(SQLUser.id != user.id)
-				.options(joinedload(SQLImage.document_version)
-				         .joinedload(SQLDocumentVersion.document)
-				         .joinedload(SQLDocument.report))
+				.options(
+					joinedload(SQLImage.document_version)
+					.joinedload(SQLDocumentVersion.document)
+					.joinedload(SQLDocument.report))
 			)
 			images = result.scalars().all()
 
@@ -130,11 +130,15 @@ class CRepositoryServiceCheating:
 					try:
 						next_uuid = image_uuid_map[rel_id]
 						file_name = file_path + next_uuid + ext
-						client.put_object(global_bucket_name, file_name, BytesIO(Image.data),
-						                  len(Image.data))
+						client.put_object(
+							config.minio_bucket_name,
+							file_name,
+							BytesIO(Image.data),
+						    len(Image.data)
+						)
 					except Exception as e:
 						# Если загрузка в MinIO не удалась, откатываем транзакцию
-						print(f"Ошибка загрузки изображения в MinIO: {e}")
+						logger.exception(f"Ошибка загрузки изображения в MinIO: {e}")
 						raise
 
 				# Если все файлы успешно загружены в MinIO, коммитим транзакцию
