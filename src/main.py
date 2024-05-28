@@ -8,7 +8,6 @@ from src.routers import CRouterServiceCheating
 from src.routers import CRouterActiveSettings
 from src.database import create_tables
 
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 init_logging()
 

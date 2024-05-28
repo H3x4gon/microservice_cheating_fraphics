@@ -69,6 +69,14 @@ async def m_upload_images_to_global_bucket(
 		logger.exception(e)
 		return JSONResponse(content={"error_message": str(e)}, status_code=400)
 
+@router.post("/create")
+async def m_create_global_bucket():
+	try:
+		await CServiceCheating.create_global_bucket()
+		return JSONResponse(content={"message": f"Корзина успешно создана"})
+	except Exception as e:
+		logger.exception(e)
+		return JSONResponse(content={"error_message": str(e)}, status_code=400)
 
 @router.delete("/")
 async def m_delete_images_from_global_bucket(

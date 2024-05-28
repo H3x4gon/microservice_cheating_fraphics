@@ -1,16 +1,15 @@
 import xml.etree.ElementTree as ET
 import zipfile
-import json
+from uuid import UUID
+
 import cv2
 import os
 
 from PIL import Image
 from io import BytesIO
-from fastapi.encoders import jsonable_encoder
 
 from numpy import count_nonzero, array
-from base64 import b64encode
-from typing import Dict
+from typing import Dict, List
 
 from src.schemas.schemas import CImage
 from src.schemas.schemas import CImageSet
@@ -40,9 +39,8 @@ def create_cimage(filename: str, img_data: bytes, rel_id: str) -> CImage:
 	return img
 
 
-def extract_images_from_docx(file) -> CImageSet:
-	image_set = CImageSet()
-
+def extract_images_from_docx_into_list(file) -> List[CImage]:
+	image_list = []
 	with zipfile.ZipFile(file, "r") as zip_ref:
 		relationships = extract_relationships(zip_ref)
 		filename_to_rel_id = {target: rel_id for rel_id, target in relationships.items()}
@@ -53,40 +51,53 @@ def extract_images_from_docx(file) -> CImageSet:
 				img_filename = os.path.basename(filename)
 
 				rel_id = filename_to_rel_id.get(img_filename)
-
 				if rel_id:
-					img = create_cimage(filename, img_data, rel_id)
-					image_set.images[rel_id] = img
+					image_list.append(create_cimage(filename, img_data, rel_id))
 
-	return image_set
+	return image_list
 
 
+def extract_images_from_docx(file, document_version: UUID) -> CImageSet:
+	image_list = extract_images_from_docx_into_list(file)
+
+	for image in image_list:
+		image.document_ver_id = document_version
+
+	images_dict: Dict[UUID, List[CImage]] = {document_version: image_list}
+	return CImageSet(images=images_dict)
+
+
+# Функция для сравнения изображений по среднему хэшу
 def avg_hash_comparison(incoming_image_set: CImageSet, stored_image_set: CImageSet):
-	for incoming_image_id, incoming_image in incoming_image_set.images.items():
-		max_similarity = -1
-		img_path_with_min_similarity = None
+	for incoming_images in incoming_image_set.images.values():
+		for incoming_image in incoming_images:
+			max_similarity = -1
+			img_path_with_max_similarity = None
 
-		for stored_image_id, stored_image in stored_image_set.images.items():
-			similarity = compare_hash(incoming_image.hash, stored_image.hash)
-			normalized_similarity = 1 - (similarity / 64)
-			if normalized_similarity > max_similarity:
-				max_similarity = normalized_similarity
-				img_path_with_min_similarity = config.minio_bucket_name + "/images/" + str(
-					stored_image.document_ver_id) + "/" + str(stored_image.id) + ".png"
+			for stored_images in stored_image_set.images.values():
+				for stored_image in stored_images:
+					similarity = compare_hash(incoming_image.hash, stored_image.hash)
+					normalized_similarity = 1 - (similarity / 64)
+					if normalized_similarity > max_similarity:
+						max_similarity = normalized_similarity
+						img_path_with_max_similarity = config.minio_bucket_name + "/images/" + str(
+							stored_image.document_ver_id) + "/" + str(stored_image.id) + ".png"
 
-		incoming_image.max_similarity = max_similarity
-		incoming_image.img_path_with_max_similarity = img_path_with_min_similarity
+			incoming_image.max_similarity = max_similarity
+			incoming_image.img_path_with_max_similarity = img_path_with_max_similarity
 
 
 def sizeof_comparison(incoming_image_set: CImageSet, stored_image_set: CImageSet):
-	for incoming_image_id, incoming_image in incoming_image_set.images.items():
-		for stored_image_id, stored_image in stored_image_set.images.items():
-			if incoming_image.size == stored_image.size:
-				img_path_with_min_similarity = config.minio_bucket_name + "/images/" + str(
-					stored_image.document_ver_id) + "/" + str(stored_image.id) + ".png"
-				incoming_image.max_similarity = 1
-				incoming_image.img_path_with_max_similarity = img_path_with_min_similarity
-				break
+	for incoming_images in incoming_image_set.images.values():
+		for incoming_image in incoming_images:
+			for stored_images in stored_image_set.images.values():
+				for stored_image in stored_images:
+					if incoming_image.size == stored_image.size:
+						img_path_with_max_similarity = config.minio_bucket_name + "/images/" + str(
+							stored_image.document_ver_id) + "/" + str(stored_image.id) + ".png"
+						incoming_image.max_similarity = 1
+						incoming_image.img_path_with_max_similarity = img_path_with_max_similarity
+						break
 
 
 def compare_image_sets(incoming_image_set: CImageSet, stored_image_set: CImageSet, method: str) -> CImageSet:
@@ -117,7 +128,7 @@ def calc_image_hash(image_obj: CImage) -> str:
 
 
 def calc_image_set_hashes(imageset_obj: CImageSet) -> None:
-	for img_name, img_obj in imageset_obj.images.items():
+	for img_obj in imageset_obj.images:
 		img_obj.hash = calc_image_hash(img_obj)
 
 

@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 from uuid import UUID
-from typing import Optional
-from typing import Dict
+from typing import Optional, List, Dict
 from fastapi.encoders import jsonable_encoder
 
 
@@ -20,7 +19,6 @@ class CImage(BaseModel):
 		from_attributes = True
 
 	def json_compatible(self):
-		# image_data_base64 = b64encode(self.data).decode('utf-8')
 		return jsonable_encoder({
 			"img_id": self.id,
 			"filename": self.filename,
@@ -31,11 +29,14 @@ class CImage(BaseModel):
 
 
 class CImageSet(BaseModel):
-	images: Dict[UUID, CImage] = {}
+	images: Dict[UUID, List[CImage]] = {}
 
 	def json_compatible(self):
-		images_json_compatible = {document_ver_id: image.json_compatible() for document_ver_id, image in
-		                          self.images.items()}
-		return jsonable_encoder({
-			"suspect_imageset": images_json_compatible
-		})
+		# Преобразуем каждый объект CImage в JSON-совместимый формат
+		images_json_compatible = {
+			str(key) + ".docx": [image.json_compatible() for image in value]
+			for key, value in self.images.items()
+		}
+		return jsonable_encoder(
+			images_json_compatible
+		)
