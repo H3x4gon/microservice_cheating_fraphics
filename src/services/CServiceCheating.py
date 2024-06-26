@@ -1,5 +1,9 @@
-from fastapi import Query
+from typing import Annotated
+
 from uuid import UUID
+
+from fastapi import Query
+from pydantic import Field
 
 from .CServiceImages import extract_images_from_docx, compare_image_sets
 from src.repositories.CRepositoryServiceCheating import CRepositoryServiceCheating, NoImagesFoundError
@@ -14,7 +18,8 @@ class CServiceCheating:
 		cls,
 		document_version: UUID,
 		async_session,
-		method: str = Query(...)
+		method: str,
+		threshold: Annotated[int, Field(ge=1, le=100)],
 	):
 
 		try:
@@ -47,20 +52,38 @@ class CServiceCheating:
 					reference_image_set.images[doc_ver_id] = []
 				reference_image_set.images[doc_ver_id].append(reference_image)
 
+			# Преобразуем пороговое значение в диапазон от 0 до 1
+			normalized_threshold = threshold / 100.0
+
 			# Сравниваем наборы изображений
 			result_image_set = compare_image_sets(suspect_image_set, reference_image_set, method)
+			temp_image_set = result_image_set.copy()
 
-			return result_image_set.json_compatible()
+			total_image_count = sum(len(image_list) for image_list in result_image_set.images.values())
+			justified_image_count = 0
 
-		except Exception as e:
-			raise e
+			for images in result_image_set.images.values():
+				for image in images:
+					if image.max_similarity is None or image.max_similarity < normalized_threshold:
+						justified_image_count += 1
 
-	@classmethod
-	async def create_global_bucket(
-		cls,
-	):
-		try:
-			await CRepositoryServiceCheating.create_global_bucket()
+			# Фильтруем список изображений
+			for key in temp_image_set.images:
+				temp_image_set.images[key] = [
+					image for image in temp_image_set.images[key]
+					if image.max_similarity is not None and image.max_similarity >= normalized_threshold
+				]
+
+			originality_score = (justified_image_count * 100) / total_image_count if total_image_count > 0 else None
+
+			if originality_score is not None:
+				originality_score = round(originality_score, 2)
+
+			return {
+				"result_image_set": temp_image_set.json_compatible(),
+				"originality_score": originality_score
+			}
+
 		except Exception as e:
 			raise e
 

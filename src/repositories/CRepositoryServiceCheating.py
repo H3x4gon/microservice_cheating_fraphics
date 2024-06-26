@@ -24,14 +24,6 @@ class NoImagesFoundError(Exception):
 class CRepositoryServiceCheating:
 
 	@classmethod
-	async def create_global_bucket(cls):
-		# Проверяем, существует ли бакет
-		found = client.bucket_exists(config.minio_bucket_name)
-		if not found:
-			# Создаем бакет, если он не существует
-			client.make_bucket(config.minio_bucket_name)
-
-	@classmethod
 	# Выгрузка файла с MinIO
 	async def pull_file(
 			cls,

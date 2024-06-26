@@ -2,8 +2,9 @@ from fastapi import APIRouter, UploadFile, File, Query, Depends
 from enum import Enum
 from uuid import UUID
 
-from typing import List
+from typing import List, Optional, Annotated
 
+from pydantic import conint, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi.responses import JSONResponse
@@ -40,13 +41,15 @@ logger = logging.getLogger("ServiceCheatingGraphics")
 async def m_check_images_for_uniqueness(
 	document_version: UUID,
 	async_session: AsyncSession = Depends(get_session),
-	method: ComparisonMethod = Query(...)
+	method: ComparisonMethod = Query(...),
+	threshold: Annotated[int, Field(ge=1, le=100)] = Query(..., description="Threshold value for comparison (1-100)"),
 ):
 	try:
 		comparison_result = await CServiceCheating.check_images_for_uniqueness(
 			document_version,
 			async_session,
-			method.value
+			method.value,
+			threshold
 		)
 		return JSONResponse(content={"result": comparison_result})
 	except Exception as e:
@@ -65,15 +68,6 @@ async def m_upload_images_to_global_bucket(
 			async_session
 		)
 		return JSONResponse(content={"message": f"Изображения файла с UUID={str(document_version)} успешно загружены"})
-	except Exception as e:
-		logger.exception(e)
-		return JSONResponse(content={"error_message": str(e)}, status_code=400)
-
-@router.post("/create")
-async def m_create_global_bucket():
-	try:
-		await CServiceCheating.create_global_bucket()
-		return JSONResponse(content={"message": f"Корзина успешно создана"})
 	except Exception as e:
 		logger.exception(e)
 		return JSONResponse(content={"error_message": str(e)}, status_code=400)

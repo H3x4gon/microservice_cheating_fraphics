@@ -72,7 +72,7 @@ def avg_hash_comparison(incoming_image_set: CImageSet, stored_image_set: CImageS
 	for incoming_images in incoming_image_set.images.values():
 		for incoming_image in incoming_images:
 			max_similarity = -1
-			img_path_with_max_similarity = None
+			img_id_with_max_similarity = None
 
 			for stored_images in stored_image_set.images.values():
 				for stored_image in stored_images:
@@ -80,11 +80,10 @@ def avg_hash_comparison(incoming_image_set: CImageSet, stored_image_set: CImageS
 					normalized_similarity = 1 - (similarity / 64)
 					if normalized_similarity > max_similarity:
 						max_similarity = normalized_similarity
-						img_path_with_max_similarity = config.minio_bucket_name + "/images/" + str(
-							stored_image.document_ver_id) + "/" + str(stored_image.id) + ".png"
+						img_id_with_max_similarity = str(stored_image.id)
 
 			incoming_image.max_similarity = max_similarity
-			incoming_image.img_path_with_max_similarity = img_path_with_max_similarity
+			incoming_image.img_id_with_max_similarity = img_id_with_max_similarity
 
 
 def sizeof_comparison(incoming_image_set: CImageSet, stored_image_set: CImageSet):
@@ -93,14 +92,13 @@ def sizeof_comparison(incoming_image_set: CImageSet, stored_image_set: CImageSet
 			for stored_images in stored_image_set.images.values():
 				for stored_image in stored_images:
 					if incoming_image.size == stored_image.size:
-						img_path_with_max_similarity = config.minio_bucket_name + "/images/" + str(
-							stored_image.document_ver_id) + "/" + str(stored_image.id) + ".png"
+						incoming_image.img_id_with_max_similarity = str(stored_image.id)
 						incoming_image.max_similarity = 1
-						incoming_image.img_path_with_max_similarity = img_path_with_max_similarity
 						break
 
 
-def compare_image_sets(incoming_image_set: CImageSet, stored_image_set: CImageSet, method: str) -> CImageSet:
+def compare_image_sets(incoming_image_set: CImageSet, stored_image_set: CImageSet, method: str
+                       ) -> CImageSet:
 	if method == "AvgHash comparison method":
 		avg_hash_comparison(incoming_image_set, stored_image_set)
 	elif method == "Sizeof comparison method":
@@ -128,8 +126,9 @@ def calc_image_hash(image_obj: CImage) -> str:
 
 
 def calc_image_set_hashes(imageset_obj: CImageSet) -> None:
-	for img_obj in imageset_obj.images:
-		img_obj.hash = calc_image_hash(img_obj)
+	for img_list in imageset_obj.images.values():
+		for img_obj in img_list:
+			img_obj.hash = calc_image_hash(img_obj)
 
 
 def compare_hash(hash1, hash2):
